@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>超级正则2 · 网页版</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+:root{
+  /* 暗色方案 */
+  --bg:#1e1e1e;          /* 全局底色 → 暗灰 */
+  --bar:#23272f;         /* 顶栏不变（已经够暗） */
+  --accent:#00b4ff;      /* 强调色不变 */
+  --accent2:#ff4d84;
+  --card3:#3f3f3f; 
+  --card2:#2f2f2f; 
+  --areatext:#afafaf; 
+  --card:#1f1f1f;        /* 卡片色 → 稍亮一点的深灰 */
+  --border:#3c3c3c;      /* 边框同步调暗 */
+  --shadow:0 8px 20px -6px rgba(0,0,0,.35);
+  --trans:.25s cubic-bezier(.4,0,.2,1);
+}
+*{
+  box-sizing:border-box;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans",sans-serif;
+}
+body{
+  margin:0;
+  background:var(--bg);
+  display:flex;
+  flex-direction:column;
+  height:100vh;
+  color:#222;
+}
+.toolbar{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:10px 16px;
+  background:var(--bar);
+  box-shadow:var(--shadow);
+  z-index:10;
+  flex-wrap:wrap;
+}
+.toolbar button{
+  position:relative;
+  border:none;
+  background:linear-gradient(135deg,var(--accent),#0099e0);
+  color:#fff;
+  padding:6px 14px;
+  border-radius:6px;
+  cursor:pointer;
+  font-size:16px;
+  transition:transform var(--trans),box-shadow var(--trans);
+  overflow:hidden;
+}
+.toolbar button:hover{
+  transform:translateY(-2px);
+  box-shadow:0 4px 12px rgba(0,180,255,.35);
+}
+.toolbar button:active{
+  transform:translateY(0) scale(.96);
+}
+.toolbar select{
+  height:30px;
+  padding:0 8px;
+  border-radius:4px;
+  border:1px solid var(--border);
+  font-size:18px;
+  background:var(--areatext);
+    cursor:pointer;
+}
+.inputs{
+  display:flex;
+  gap:12px;
+  padding:12px 16px 0;
+}
+.inputs input{
+  flex:1;
+  height:56px;
+  padding:0 12px;
+  border:1px solid var(--border);
+  border-radius:8px;
+  background:var(--card2);
+  color:var(--areatext);
+  font-size:18px;
+  transition:box-shadow var(--trans),border-color var(--trans);
+}
+.inputs input:focus{
+  outline:none;
+  border-color:var(--accent);
+  box-shadow:0 0 0 3px rgba(0,180,255,.15);
+}
+.panels{
+  flex:1;
+  display:flex;
+  gap:12px;
+  background:var(--card);
+  padding:12px 16px 16px;
+}
+.panel{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  background:var(--card2);
+  border-radius:10px;
+  box-shadow:var(--shadow);
+  padding:12px;
+}
+.panel h3{
+  margin:0 0 8px;
+  font-size:13px;
+  font-weight:600;
+  color:var(--accent);
+}
+.panel textarea{
+  flex:1;
+  border:1px solid var(--border);
+  border-radius:6px;
+  padding:8px;
+  font-size:18px;
+  resize:none;
+  transition:border-color var(--trans);
+  background:var(--card);
+  color:var(--areatext)
+}
+textarea::-webkit-scrollbar {
+    width: 10px;                 /* 纵向滚动条宽度 */
+    height: 10px;                /* 横向滚动条高度 */
+    background: #444;         /* 轨道背景色（暗色示例） */
+}
+
+/* 滚动条滑块 */
+textarea::-webkit-scrollbar-thumb {
+    background: #777;            /* 滑块颜色 */
+    border-radius: 5px;
+}
+textarea::-webkit-scrollbar-thumb:hover {
+    background: #999;         /* 鼠标悬停高亮 */
+}
+
+/* 滚动条两端按钮（可选） */
+textarea::-webkit-scrollbar-button {
+    display: none;               /* 不需要就隐藏 */
+}
+.panel textarea:focus{
+  outline:none;
+  border-color:var(--accent);
+}
+#log{
+  height:20px;
+  font-size:12px;
+  color:var(--accent);
+  padding:0 16px;
+}
+@keyframes shine{
+  0%{background-position:-100% 0}
+  100%{background-position:200% 0}
+}
+.toolbar button::after{
+  content:'';
+  position:absolute;
+  top:0;
+  left:0;
+  width:200%;
+  height:100%;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.4),transparent);
+  animation:shine 3s infinite linear;
+}
+@media(max-width:700px){
+  .panels{flex-direction:column}
+}
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <button id="btnPaste">粘贴</button>
+  <button id="btnExtract">提取</button>
+  <button id="btnReplace">替换</button>
+  <button id="btnMoveL">左移</button>
+  <button id="btnCopy">复制</button>
+  <button id="btnSave">收藏</button>
+  <select id="cmbFav" title="选择收藏的正则"></select>
+  <button id="btnExport">导出收藏</button>
+  <button id="btnImport">导入收藏</button>
+  <input type="file" id="fileInput" accept=".json" style="display:none">
+</div>
+
+<div class="inputs">
+  <input id="txtFind" placeholder="正则表达式 / find">
+  <input id="txtRepl" placeholder="替换为 / replace（支持 \n 换行、_IndeX_ 自增）">
+</div>
+
+<div class="panels">
+  <div class="panel">
+    <h3>输入 / Input</h3>
+    <textarea id="txtInput" spellcheck="false"></textarea>
+  </div>
+  <div class="panel">
+    <h3>结果 / Output</h3>
+    <textarea id="txtOutput" spellcheck="false" readonly></textarea>
+  </div>
+</div>
+
+<div id="log"></div>
+
+<script>
+/* ---------- 工具 ---------- */
+const $ = id => document.getElementById(id);
+const log = msg => { $('log').textContent = msg; setTimeout(()=>$('log').textContent='',1800); };
+function safeRegex(pat,flags='g'){
+  try{ return new RegExp(pat,flags); }catch(e){ alert('正则语法错误：'+e.message); return null; }
+}
+/* ---------- 收藏 ---------- */
+const FAV_KEY = 'superRegex_fav2';
+function loadFav(){
+  const arr = JSON.parse(localStorage.getItem(FAV_KEY)||'[]');
+  const c = $('cmbFav');
+  c.innerHTML = '<option value="">-- 收藏列表 --</option>';
+  arr.forEach((it,i)=>{
+    const o = document.createElement('option'); o.value=i; o.text=it.find; c.appendChild(o);
+  });
+}
+function saveFav(f,r){
+  const arr = JSON.parse(localStorage.getItem(FAV_KEY)||'[]');
+  arr.push({find:f,repl:r});
+  localStorage.setItem(FAV_KEY, JSON.stringify(arr));
+  loadFav();
+}
+/* ---------- 导入/导出 ---------- */
+$('btnExport').onclick = ()=>{
+  const arr = JSON.parse(localStorage.getItem(FAV_KEY)||'[]');
+  const blob = new Blob([JSON.stringify(arr,null,2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'superRegex_fav.json'; a.click();
+  URL.revokeObjectURL(url);
+  log('已导出');
+};
+$('btnImport').onclick = ()=> $('fileInput').click();
+$('fileInput').onchange = async (e)=>{
+  const file = e.target.files[0]; if(!file) return;
+  try{
+    const txt = await file.text();
+    const data = JSON.parse(txt);
+    if(!Array.isArray(data)) throw new Error('格式错误');
+    const old = JSON.parse(localStorage.getItem(FAV_KEY)||'[]');
+    const map = new Map(old.map(it=>[it.find,it]));
+    let added=0;
+    data.forEach(it=>{ if(it.find && !map.has(it.find)){ map.set(it.find,it); added++; } });
+    localStorage.setItem(FAV_KEY, JSON.stringify(Array.from(map.values())));
+    loadFav(); log(`导入完成，新增 ${added} 条`);
+  }catch(err){ alert('导入失败：'+err.message); }
+  e.target.value = '';
+};
+/* ---------- 原功能 ---------- */
+$('btnPaste').onclick = async ()=>{
+  const t = await navigator.clipboard.readText().catch(()=>'');
+  $('txtInput').value = t; log('已粘贴');
+};
+$('btnExtract').onclick = ()=>{
+  const p = $('txtFind').value;
+  if(!p){ log('正则为空'); return; }
+  const r = safeRegex(p,'g'); if(!r) return;
+  const inp = $('txtInput').value;
+  let m, a=[];
+  while((m=r.exec(inp))!==null){ a.push(m[0]); if(!r.global) break; }
+  $('txtOutput').value = a.join('\n'); log(`找到 ${a.length} 处`);
+};
+$('btnReplace').onclick = ()=>{
+  const f = $('txtFind').value;
+  const p = $('txtRepl').value;
+  if(!f){ log('查找为空'); return; }
+  const r = safeRegex(f,'g'); if(!r) return;
+  /* ---- 关键：把字面量 \n 等转成真实字符 ---- */
+  const realRepl = p.replace(/\\([nrt\\])/g, (_,c)=>
+     c==='n'?'\n': c==='r'?'\r': c==='t'?'\t': '\\');
+  let t = $('txtInput').value.replace(r, realRepl);
+  let idx=0; t = t.replace(/_IndeX_/g, ()=>idx++);
+  $('txtOutput').value = t; log('替换完成');
+};
+$('btnMoveL').onclick = ()=>{ $('txtInput').value = $('txtOutput').value; log('已左移'); };
+$('btnCopy').onclick = async ()=>{ await navigator.clipboard.writeText($('txtOutput').value).catch(()=>{}); log('已复制'); };
+$('btnSave').onclick = ()=>{
+  const f=$('txtFind').value.trim(), p=$('txtRepl').value.trim();
+  if(!f){ log('查找为空'); return; }
+  saveFav(f,p); log('已收藏');
+};
+$('cmbFav').onchange = e=>{
+  const idx=e.target.value; if(idx==='') return;
+  const it = JSON.parse(localStorage.getItem(FAV_KEY)||'[]')[idx];
+  if(it){ $('txtFind').value=it.find; $('txtRepl').value=it.repl; }
+};
+/* ---------- 初载 ---------- */
+loadFav();
+</script>
+</body>
+</html>
